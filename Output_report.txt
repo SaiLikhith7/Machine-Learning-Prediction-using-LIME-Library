@@ -1,0 +1,262 @@
+Task1-  
+
+1.1. Use the provided code and load the required data. This will fetch the training and test
+datasets from the 20 newsgroups corpus for two categories, Atheism and Christianity.
+a. Compute and report the number of documents in training and test datasets.
+b. Index the documents in each dataset (training and test) by creating a 0-based
+index column for each dataset.
+● Name this column “id”
+● Paste the first 5 lines of indexed test set into your report (truncate = True)
+
+
+a) No. of training dataset documents(train_df): 1079
+   No. of test dataset documents(test_df): 717
+    
+
+b) These are the first 5 lines of my code after indexing: I used ZipwithIndex() so that we can have continous indexes. MonotonicallyIncreasingid will miss some ids, so this is the best way.
+
+>>> test_df.show(n=5, truncate=True)
++---+-----------+--------------------+
+| id|   category|                text|
++---+-----------+--------------------+
+|  0|alt.atheism|From: mathew <mat...|
+|  1|alt.atheism|From: halat@panth...|
+|  2|alt.atheism|From: Nanci Ann M...|
+|  3|alt.atheism|From: ch981@cleve...|
+|  4|alt.atheism|From: bobbe@vice....|
++---+-----------+--------------------+
+only showing top 5 rows
+
+
+1.2.
+
+a. Compute and report the F1-score on the test dataset.
+b. Report the schema of the model’s prediction output. Giving names and data types
+of columns is sufficient.
+
+a) F1-Score: 0.9483960948396095
+
+b)  	Name	  		DataType
+
+     id		        : long (nullable = true)
+     category		: string (nullable = true)
+     text		: string (nullable = true)
+     label		: double (nullable = false)
+     words		: array (nullable = true)
+     element		: string (containsNull = true)
+     rawFeatures	: vector (nullable = true)
+     features		: vector (nullable = true)
+     rawPrediction	: vector (nullable = true)
+     probability	: vector (nullable = true)
+     prediction		: double (nullable = false)
+
+3.
+
++---+--------------------+--------------------+-----+--------------------+--------------------+--------------------+--------------------+--------------------+----------+
+| id|            category|                text|label|               words|         rawFeatures|            features|       rawPrediction|         probability|prediction|
++---+--------------------+--------------------+-----+--------------------+--------------------+--------------------+--------------------+--------------------+----------+
+|  0|         alt.atheism|From: mathew <mat...|  1.0|[From, mathew, ma...|(262144,[619,1941...|(262144,[619,1941...|[-7.1763940629458...|[7.63835435734541...|       1.0|
+|275|         alt.atheism|From: christen@as...|  1.0|[From, christen, ...|(262144,[2437,579...|(262144,[2437,579...|[0.59563709652989...|[0.64465750953381...|       0.0|
+|664|soc.religion.chri...|From: marlatt@spo...|  0.0|[From, marlatt, s...|(262144,[14,1311,...|(262144,[14,1311,...|[6.15271858026515...|[0.99787682784592...|       0.0|
++---+--------------------+--------------------+-----+--------------------+--------------------+--------------------+--------------------+--------------------+----------+
+
+
+
+
+    id	category(ground truth)	probability	category(predicted)	LIME explanation
+    0		atheism            7.638              atheism           [('v1', 0.035393959938051146), ('Gregg', 0.02824876757168138), ('Cambridge', 0.02730147055421274), ('Consultants', 0.026185705330892754), ('Newsreader', 0.0255430613311772), ('ISLAMIC', 0.023854794703298265)]
+    275         atheism		   0.644            christianity	[('astro', -0.192970705615121), ('ocis', -0.1874348707734932), ('Carl', -0.1138174661113548), ('Newsreader', 0.11118828964563951), ('Host', 0.1009700198467809), ('Posting', 0.10026497115048072)]
+    664       christianity         0.997            christianity       [('Colorado', -0.023928261767668296), ('Kille', -0.023523607667526723), ('spot', -0.023509129939646673), ('Me', -0.02083281723699189), ('geneva', -0.018866998967802803), ('Organization', -0.01745092915593416)]
+ 
+
+
+
+Task2
+
+Strategy: 
+
+Step1: We collect all the explanation words (output by the LIME Explainer) for the misclassified documents. 
+Step2: Then, we sort these words in decreasing order of the sum of the weights grouped by word
+Step3: Now, iteratively delete the words from all the documents they exist in and only if it contributes to improve the F1-score:
+
+iteratively delete the words from all the documents they exist in and repeat the process of training the model and calculating the new F-scores. 
+case1: suppose if that Word's deletion doesn't have a positive impact on the F-Score, we bring back the documents back to their previous states (where that word was not deleted). 
+case2: On the other hand, if the word's deletion has a positive impact on the f-score of the  model, we keep the documents in their current state and go to the next word in the list.
+
+Step4: We do so for the first 30 words (sorted by decreasing weights). This gives us a good improvement in the f-score till 96, if we do for 45 words, we get 96.5 and if we do for 70+ words, its 97
+
+
+ F1 score after feature selection :  0.9609483960948396 ( after 30 rows), 0.9659(after 45 rows)
+
+ F1 score before feature selection: 0.9483960948396095
+
+
+
+ a) The top features list that helped in misclassification are :
+        Word List are as follows : ( we can select a threshold on choosing the number of words to be selected like 40, 50 etc in order to improve the accuracy )
+         Top 40 features list are:
+         ['Organization', 'Carl', 'astro', 'ocis', 'Newsreader', 'ctron', 'Posting', 'Alan', 'Host', 'sincere', 'Tribulation', 'agonizing', 'Antichrist', 'Asimov', 'Freemasonry', 'Return', 'Path', 'Conversions', 'beast', 'carpenter', 'output', 'Scouts', 'fsu', 'warns', 'Boy', 'refuses', 'feedback', 'Julian', 'Rabbi', 'math', 'creationists', 'stamp', 'TIN', 'loud', 'Nntp', 'scriptures', 'Astrophysics', 'constructive', 'Todd', 'LaTech']
+         
+    b) Iterating on these features and testing if they improve the accuracy:
+            Running for word ----- Organization
+            Running for word ----- Carl
+                Calculated F1 score:  0.9511854951185496
+                Wrd removed is:  Carl
+                Previous F1 score:  0.9483960948396095
+            Running for word ----- astro
+            Running for word ----- ocis
+            Running for word ----- Newsreader
+            Running for word ----- ctron
+                Calculated F1 score:  0.9539748953974896
+                Wrd removed is:  ctron
+                Previous F1 score:  0.9511854951185496
+            Running for word ----- Posting
+            Running for word ----- Alan
+                Calculated F1 score:  0.9553695955369595
+                Wrd removed is:  Alan
+                Previous F1 score:  0.9539748953974896
+            Running for word ----- Host
+            Running for word ----- sincere
+                Calculated F1 score:  0.9567642956764296
+                Wrd removed is:  sincere
+                Previous F1 score:  0.9553695955369595
+            Running for word ----- Tribulation
+            Running for word ----- agonizing
+            and so on...
+        This seems reasonable as for example the words Organization, astro has occurred frequently with high weights have led to misclasification it might not be frequently occuring in the training dataset.
+     c) Removed features from the training set are: 
+        ['Carl', 'ctron', 'Alan', 'sincere', 'agonizing', 'Antichrist', 'Asimov', 'Path', 'warns', 'math']
+
+3)
+F1 score before feature selection :  0.9483960948396095
+F1 score after feature selection :  0.9651324965132496
+
+4)
+New misclassified id's after feature selection are as follows :
+  [3, 15, 24, 26, 72, 104, 112, 114, 116, 125, 154, 184, 190, 208, 212, 229, 236, 269, 282, 284, 285, 306, 317, 482, 669, 675]
+
+Old misclassified id's before feature selection are as follows :
+  [3, 15, 24, 26, 59, 72, 104, 112, 114, 116, 125, 154, 165, 184, 190, 195, 208, 209, 212, 229, 232, 236, 268, 269, 275, 282, 284, 285, 306, 315, 317, 318, 482, 669, 675]
+
+id's that are correctly classified now after feature selection and that were previously misclassified are as follows:
+ [59, 165, 195, 209, 232, 268, 275, 282, 315, 318]
+And their information can be seen as one follows:
+
++---+-----------+--------------------+-----+--------------------+--------------------+--------------------+--------------------+--------------------+----------+
+| id|   category|                text|label|               words|         rawFeatures|            features|       rawPrediction|         probability|prediction|
++---+-----------+--------------------+-----+--------------------+--------------------+--------------------+--------------------+--------------------+----------+|
+| 59|alt.atheism|From: pww@spacsun...|  1.0|[From, pww, spacs...|(262144,[170,1311...|(262144,[170,1311...|[-0.9242089827081...|[0.28410106185192...|       1.0|
+|165|alt.atheism|From: bobbe@vice ...|  1.0|[From, bobbe, vic...|(262144,[513,1137...|(262144,[513,1137...|[-0.0361057566862...|[0.49097454129210...|       1.0|
+|195|alt.atheism|From: decay@cbnew...|  1.0|[From, decay, cbn...|(262144,[14,1469,...|(262144,[14,1469,...|[-0.4690778198203...|[0.38483453450144...|       1.0|
+|209|alt.atheism|From: kadie@cs.ui...|  1.0|[From, kadie, cs,...|(262144,[15,9639,...|(262144,[15,9639,...|[-0.6124973447644...|[0.35148973050771...|       1.0|
+|232|alt.atheism|From: dps@nasa.ko...|  1.0|[From, dps, nasa,...|(262144,[600,1311...|(262144,[600,1311...|[-0.1366999166795...|[0.46587814017707...|       1.0|
+|268|alt.atheism|From: scharle@luk...|  1.0|[From, scharle, l...|(262144,[1838,432...|(262144,[1838,432...|[-0.1855496067165...|[0.45374522970094...|       1.0|
+|275|alt.atheism|From: christen@as...|  1.0|[From, christen, ...|(262144,[2437,579...|(262144,[2437,579...|[-0.0238916044022...|[0.49402738299857...|       1.0|
+|282|alt.atheism|From: mcelwre@cns...|  1.0|[From, mcelwre, c...|(262144,[510,571,...|(262144,[510,571,...|[-0.4508191281617...|[0.38916602865049...|       1.0|
+|315|alt.atheism|From: Alan.Olsen@...|  1.0|[From, Alan, Olse...|(262144,[1311,183...|(262144,[1311,183...|[-0.1098508340163...|[0.47256487472392...|       1.0|
+|318|alt.atheism|Subject: Re: Alle...|  1.0|[Subject, Re, All...|(262144,[1311,337...|(262144,[1311,337...|[-0.5031154882820...|[0.37680879730257...|       1.0|
++---+-----------+--------------------+-----+--------------------+--------------------+--------------------+--------------------+--------------------+----------+
+
+
+For id  59  :
+(i) categories (ground truth) :  Atheism
+(ii) probabilities over categories computed by the classifier :
+
+Probability(Atheism) = 0.7158989381480785
+Probability(Christian) = 0.2841010618519216
+(iii) predicted category for the document :  Atheism
+(iv) LIMEs generated textual explanation, in terms of 6 features :  [('math', -0.12869640180486477), ('particle', 0.08524407326763528), ('hole', -0.07560053586427168), ('sinners', -0.06363319394527724), ('Re', 0.05473961084885807), ('IASTATE', 0.052511916311514466)]
+
+19/11/27 11:23:55 WARN TaskSetManager: Stage 1469 contains a task of very large size (10911 KB). The maximum recommended task size is 100 KB.
+For id  165  :
+(i) categories (ground truth) :  Atheism
+(ii) probabilities over categories computed by the classifier :
+
+Probability(Atheism) = 0.5090254587078923
+Probability(Christian) = 0.49097454129210766
+(iii) predicted category for the document :  Atheism
+(iv) LIMEs generated textual explanation, in terms of 6 features :  [('Tribulation', 0.2820191695156994), ('Antichrist', -0.27869511623450677), ('beast', -0.10862079684855738), ('YOU', 0.09835739320106997), ('Daniel', -0.09189458323768131), ('seven', -0.0882792546042637)]
+
+19/11/27 11:27:09 WARN TaskSetManager: Stage 1474 contains a task of very large size (2286 KB). The maximum recommended task size is 100 KB.
+For id  195  :
+(i) categories (ground truth) :  Atheism
+(ii) probabilities over categories computed by the classifier :
+
+Probability(Atheism) = 0.61516546549856
+Probability(Christian) = 0.38483453450144006
+(iii) predicted category for the document :  Atheism
+(iv) LIMEs generated textual explanation, in terms of 6 features :  [('agonizing', -0.2759941693794867), ('carpenter', -0.19471403564698714), ('cbnewsj', 0.09334030667675144), ('kaflowitz', 0.08888905766927102), ('na', 0.0630633095439248), ('Gotta', 0.05392816058034338)]
+
+19/11/27 11:28:27 WARN TaskSetManager: Stage 1479 contains a task of very large size (1239 KB). The maximum recommended task size is 100 KB.
+For id  209  :
+(i) categories (ground truth) :  Atheism
+(ii) probabilities over categories computed by the classifier :
+
+Probability(Atheism) = 0.6485102694922844
+Probability(Christian) = 0.35148973050771565
+(iii) predicted category for the document :  Atheism
+(iv) LIMEs generated textual explanation, in terms of 6 features :  [('Carl', -0.27680078046853107), ('Scouts', 0.167998550542032), ('Boy', 0.1472339639641506), ('Organization', -0.09961218232780164), ('Comp', -0.08416107534713883), ('Scout', 0.06704893883319074)]
+
+For id  232  :
+(i) categories (ground truth) :  Atheism
+(ii) probabilities over categories computed by the classifier :
+
+Probability(Atheism) = 0.5341218598229205
+Probability(Christian) = 0.46587814017707946
+(iii) predicted category for the document :  Atheism
+(iv) LIMEs generated textual explanation, in terms of 6 features :  [('warns', -0.0857221784069982), ('Posting', 0.07137802285129652), ('Host', 0.07096183196252753), ('sincere', -0.06705048844765889), ('Organization', -0.061139788993553934), ('Nntp', 0.05645009461703607)]
+
+19/11/27 11:30:52 WARN TaskSetManager: Stage 1489 contains a task of very large size (1422 KB). The maximum recommended task size is 100 KB.
+For id  268  :
+(i) categories (ground truth) :  Atheism
+(ii) probabilities over categories computed by the classifier :
+
+Probability(Atheism) = 0.5462547702990588
+Probability(Christian) = 0.4537452297009412
+(iii) predicted category for the document :  Atheism
+(iv) LIMEs generated textual explanation, in terms of 6 features :  [('ctron', -0.4839623540187058), ('debunks', 0.0341310276059639), ('Wrong', 0.030496143652608092), ('Francis', -0.02529166511642425), ('Organization', -0.021863861886447174), ('writes', 0.021379727068067487)]
+
+19/11/27 11:31:28 WARN TaskSetManager: Stage 1494 contains a task of very large size (494 KB). The maximum recommended task size is 100 KB.
+For id  275  :
+(i) categories (ground truth) :  Atheism
+(ii) probabilities over categories computed by the classifier :
+
+Probability(Atheism) = 0.5059726170014264
+Probability(Christian) = 0.4940273829985737
+(iii) predicted category for the document :  Atheism
+(iv) LIMEs generated textual explanation, in terms of 6 features :  [('ocis', -0.1919819881428216), ('astro', -0.19134789480643888), ('Carl', -0.11416176959927803), ('Newsreader', 0.1127116877056857), ('Posting', 0.10341187496807014), ('Host', 0.09956257243763775)]
+
+19/11/27 11:32:35 WARN TaskSetManager: Stage 1499 contains a task of very large size (20692 KB). The maximum recommended task size is 100 KB.
+
+For id  282  :
+(i) categories (ground truth) :  Atheism
+(ii) probabilities over categories computed by the classifier :
+
+Probability(Atheism) = 0.610833971349502
+Probability(Christian) = 0.38916602865049804
+(iii) predicted category for the document :  Atheism
+(iv) LIMEs generated textual explanation, in terms of 6 features :  [('Path', -0.212809268122455), ('output', 0.19392909641969353), ('Julian', -0.14290146770536827), ('feedback', -0.11675692033612277), ('UNLIKE', 0.08894323341454086), ('Motion', 0.08744504324650887)]
+
+For id  315  :
+(i) categories (ground truth) :  Atheism
+(ii) probabilities over categories computed by the classifier :
+
+Probability(Atheism) = 0.5274351252760747
+Probability(Christian) = 0.4725648747239252
+(iii) predicted category for the document :  Atheism
+(iv) LIMEs generated textual explanation, in terms of 6 features :  [('Alan', -0.16740834742292582), ('creationists', 0.12479451551620342), ('Organization', -0.05990372614453377), ('Olsen', 0.05916406501491939), ('surprised', -0.0490204386634709), ('Bill', 0.046137860293403596)]
+
+19/11/27 11:37:29 WARN TaskSetManager: Stage 1509 contains a task of very large size (3225 KB). The maximum recommended task size is 100 KB.
+For id  318  :
+(i) categories (ground truth) :  Atheism
+(ii) probabilities over categories computed by the classifier :
+
+Probability(Atheism) = 0.623191202697429
+Probability(Christian) = 0.376808797302571
+(iii) predicted category for the document :  Atheism
+(iv) LIMEs generated textual explanation, in terms of 6 features :  [('Return', -0.25486962989764994), ('Asimov', 0.140841764248757), ('Conversions', -0.13878152465882418), ('Carl', -0.11058983912648383), ('Host', 0.10111573155060084), ('VMS', 0.085977563805822)]
+
+
+
+
+   
